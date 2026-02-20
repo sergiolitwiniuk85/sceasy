@@ -6,6 +6,8 @@
 | 💡 for h5da to rds conversion also see [https://github.com/cellgeni/schard](https://github.com/cellgeni/schard) |
 | ----------------------------------------------------------------------------------------------- |
 
+| 💡 for rds to h5ad conversion also see [https://github.com/cellgeni/py8rds](https://github.com/cellgeni/py8rds) |
+| ----------------------------------------------------------------------------------------------- |
 
 > ### Warning
 > Before installing the conda packages below please first create a new conda environment EnvironmentName and activate it. Everything else can be installed in R.
