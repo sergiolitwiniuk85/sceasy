@@ -102,29 +102,36 @@ sceasy::convertFormat('filename.loom', from="loom", to="anndata",
 
 
 
-
 ## Seurat v5 Compatibility
 
 This fork includes full compatibility with **Seurat v5**, which introduced the new `Assay5` class. The original `sceasy` package uses deprecated `slot` parameters that cause errors with Seurat v5.
 
 ### Modifications Made
 
-#### 1. Assay Conversion (`R/methods.R`)
-Added automatic detection and temporary conversion of `Assay5` to legacy `Assay`:
-- Detects Seurat v5 objects via `packageVersion("Seurat") >= "5.0.0"`
-- Converts `Assay5` → `Assay` before conversion
-- Preserves original object structure (no permanent changes)
-- Shows warning when conversion is applied
+<details>
+<summary>Click to expand: Code changes for Seurat v5 support</summary>
 
-#### 2. GetAssayData Updates (`R/functions.R`)
-Replaced deprecated `slot` parameter with `layer` for Seurat v5:
+#### 1. Assay Conversion (`R/methods.R`)
+
+Added automatic detection and temporary conversion of `Assay5` to legacy `Assay`:
+
 ```r
-if (packageVersion("Seurat") >= "5.0.0") {
-  X <- Seurat::GetAssayData(obj, assay = assay, layer = main_layer)
-} else {
-  X <- Seurat::GetAssayData(obj, assay = assay, slot = main_layer)
+# Detectar versión de Seurat
+.is_seurat_v5 <- function(obj) {
+  inherits(obj, "Seurat") && 
+  packageVersion("Seurat") >= "5.0.0"
 }
 
+# Convertir Assay5 a Assay temporalmente
+.fix_seurat_v5_assays <- function(obj) {
+  if (!.is_seurat_v5(obj)) return(obj)
+  for (assay_name in Seurat::Assays(obj)) {
+    if (inherits(obj[[assay_name]], "Assay5")) {
+      obj[[assay_name]] <- as(object = assay_obj, Class = "Assay")
+    }
+  }
+  return(obj)
+}
 
 
 ```
