@@ -53,10 +53,19 @@ convertFormat <- function(obj, from = c("anndata", "seurat", "sce", "loom"), to 
               obj[[assay_name]] <- Seurat::as.Assay(assay_obj)
             }, error = function(e2) {
               # Method 3: Create new assay from slots (fallback)
-              counts_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "counts"), error = function(e) NULL)
-              data_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "data"), error = function(e) NULL)
-              scale_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "scale.data"), error = function(e) NULL)
-              
+#              counts_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "counts"), error = function(e) NULL)
+#              data_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "data"), error = function(e) NULL)
+#              scale_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "scale.data"), error = function(e) NULL)
+              if (packageVersion("Seurat") >= "5.0.0") {
+                counts_slot <- tryCatch(Seurat::GetAssayData(assay_obj, layer = "counts"), error = function(e) NULL)
+                data_slot <- tryCatch(Seurat::GetAssayData(assay_obj, layer = "data"), error = function(e) NULL)
+                scale_slot <- tryCatch(Seurat::GetAssayData(assay_obj, layer = "scale.data"), error = function(e) NULL)
+                     } else {
+                counts_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "counts"), error = function(e) NULL)
+                data_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "data"), error = function(e) NULL)
+                scale_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "scale.data"), error = function(e) NULL)
+              }       
+                
               new_assay <- Seurat::CreateAssayObject(counts = counts_slot)
               if (!is.null(data_slot)) {
                 new_assay <- Seurat::SetAssayData(new_assay, slot = "data", new.data = data_slot)
