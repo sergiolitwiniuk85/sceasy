@@ -21,7 +21,7 @@
         paste(colnames(df)[k_singular], collapse = ", ")
       )
     }
-    df <- df[, !k_singular, drop = F]
+    df <- df[, !k_singular, drop = FALSE]
     if (ncol(df) == 0) df[["name"]] <- rownames(df)
   }
   return(df)
@@ -46,7 +46,7 @@
 #' @import reticulate
 #' @import Matrix
 seurat2anndata <- function(obj, outFile = NULL, assay = "RNA", main_layer = "data", transfer_layers = NULL, drop_single_values = TRUE) {
-  if (!requireNamespace("Seurat")) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop("This function requires the 'Seurat' package.")
   }
   main_layer <- match.arg(main_layer, c("data", "counts", "scale.data"))
@@ -128,10 +128,10 @@ seurat2anndata <- function(obj, outFile = NULL, assay = "RNA", main_layer = "dat
 #' @import reticulate
 #' @import Matrix
 sce2anndata <- function(obj, outFile = NULL, main_layer = "counts", transfer_layers = NULL, drop_single_values = TRUE) {
-  if (!requireNamespace("SummarizedExperiment")) {
+  if (!requireNamespace("SummarizedExperiment", quietly = TRUE)) {
     stop("This function requires the 'SummarizedExperiment' package.")
   }
-  if (!requireNamespace("SingleCellExperiment")) {
+  if (!requireNamespace("SingleCellExperiment", quietly = TRUE)) {
     stop("This function requires the 'SingleCellExperiment' package.")
   }
   assay_names <- SummarizedExperiment::assayNames(obj)
@@ -239,8 +239,20 @@ loom2anndata <- function(inFile, outFile = NULL, main_layer = c("spliced", "unsp
 #'
 #' @return AnnData object
 seurat2sce <- function(obj, outFile = NULL, main_layer = NULL, assay = "RNA", ...) {
-  if (!requireNamespace("Seurat")) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop("This function requires the 'Seurat' package.")
+  }
+  # Seurat v5 compatibility: convert Assay5 to Assay before conversion
+  if (inherits(obj, "Seurat") && 
+      utils::packageVersion("Seurat") >= "5.0.0") {
+    has_assay5 <- any(vapply(Seurat::Assays(obj), function(nm) inherits(obj[[nm]], "Assay5"), logical(1)))
+    if (has_assay5) {
+      for (assay_name in Seurat::Assays(obj)) {
+        if (inherits(obj[[assay_name]], "Assay5")) {
+          obj[[assay_name]] <- as(object = obj[[assay_name]], Class = "Assay")
+        }
+      }
+    }
   }
   sce <- Seurat::as.SingleCellExperiment(obj, assay = assay, ...)
   if (!is.null(outFile)) {
@@ -262,7 +274,7 @@ seurat2sce <- function(obj, outFile = NULL, main_layer = NULL, assay = "RNA", ..
 #'
 #' @return LoomExperiment object
 sce2loom <- function(obj, outFile, main_layer = NULL, drop_single_values = TRUE, ...) {
-  if (!requireNamespace("LoomExperiment")) {
+  if (!requireNamespace("LoomExperiment", quietly = TRUE)) {
     stop("This function requires the 'LoomExperiment' package.")
   }
   scle <- LoomExperiment::SingleCellLoomExperiment(obj)
@@ -288,10 +300,10 @@ sce2loom <- function(obj, outFile, main_layer = NULL, drop_single_values = TRUE,
 #'
 #' @return LoomExperiment object
 loom2sce <- function(inFile, outFile = NULL, main_layer = NULL, main_layer_name = NULL, ...) {
-  if (!requireNamespace("LoomExperiment")) {
+  if (!requireNamespace("LoomExperiment", quietly = TRUE)) {
     stop("This function requires the 'LoomExperiment' package.")
   }
-  if (!requireNamespace("SingleCellExperiment")) {
+  if (!requireNamespace("SingleCellExperiment", quietly = TRUE)) {
     stop("This function requires the 'LoomExperiment' package.")
   }
   scle <- LoomExperiment::import(inFile)
@@ -318,7 +330,7 @@ loom2sce <- function(inFile, outFile = NULL, main_layer = NULL, main_layer_name 
   obs_df <- .regularise_df(reticulate::py_to_r(obs_pd), drop_single_values = FALSE)
   attr(obs_df, "pandas.index") <- NULL
   colnames(obs_df) <- sub("n_counts", paste0("nCounts_", assay), colnames(obs_df))
-  colnames(obs_df) <- sub("n_genes", paste0("nFeaturess_", assay), colnames(obs_df))
+  colnames(obs_df) <- sub("n_genes", paste0("nFeatures_", assay), colnames(obs_df))
   return(obs_df)
 }
 
@@ -365,7 +377,7 @@ loom2sce <- function(inFile, outFile = NULL, main_layer = NULL, main_layer_name 
 #' @import reticulate
 #' @import Matrix
 anndata2seurat <- function(inFile, outFile = NULL, main_layer = "counts", assay = "RNA", use_seurat = FALSE, lzf = FALSE, target_uns_keys = list()) {
-  if (!requireNamespace("Seurat")) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop("This function requires the 'Seurat' package.")
   }
   main_layer <- match.arg(main_layer, c("counts", "data", "scale.data"))
@@ -421,8 +433,8 @@ anndata2seurat <- function(inFile, outFile = NULL, main_layer = "counts", assay 
     } else if (main_layer == "data" && !is.null(raw_X)) {
       if (nrow(X) != nrow(raw_X)) {
         message("Raw layer was found with different number of genes than main layer, resizing X and raw.X to match dimensions")
-        raw_X <- raw_X[rownames(raw_X) %in% rownames(X), , drop = F]
-        X <- X[rownames(raw_X), , drop = F]
+        raw_X <- raw_X[rownames(raw_X) %in% rownames(X), , drop = FALSE]
+        X <- X[rownames(raw_X), , drop = FALSE]
       }
       assays <- list(Seurat::CreateAssayObject(counts = raw_X))
       assays[[1]] <- Seurat::SetAssayData(assays[[1]], slot = "data", new.data = X)
@@ -550,7 +562,9 @@ anndata2cds <- function(inFile, outFile = NULL, main_layer = "X", pcaName = "X_p
   colnames(X) <- rownames(obs_df)
   rownames(X) <- rownames(var_df)
 
-  suppressPackageStartupMessages(library(SingleCellExperiment))
+  if (!requireNamespace("SingleCellExperiment", quietly = TRUE)) {
+    stop("This function requires the 'SingleCellExperiment' package.")
+  }
   cds1 <- monocle3::new_cell_data_set(expression_data = X, cell_metadata = obs_df, gene_metadata = var_df)
 
   embed_names <- reticulate::py_to_r(builtins$list(ad$obsm$keys()))

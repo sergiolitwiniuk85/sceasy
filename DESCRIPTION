@@ -1,7 +1,7 @@
 Package: sceasy
 Type: Package
 Title: A package to help convert different single-cell data formats to each other
-Version: 0.0.7
+Version: 0.0.8
 Authors@R: c(
     person('Vladimir', 'Kiselev', email='wikiselev@users.noreply.github.com', role='cre'),
     person('Ni', 'Huang', email='nh3@users.noreply.github.com', role='aut'))
@@ -14,9 +14,11 @@ Suggests:
     Seurat (>= 3.0.1),
     SingleCellExperiment (>= 1.4.0),
     LoomExperiment (>= 1.1.5),
-    monocle3 (>= 0.2.0)
+    monocle3 (>= 0.2.0),
+    testthat (>= 3.0.0)
 SystemRequirements:
     anndata,
     loompy
 License: GPL-3
-LazyDate: true
+LazyData: true
+RoxygenNote: 7.2.3

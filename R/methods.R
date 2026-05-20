@@ -27,76 +27,39 @@ convertFormat <- function(obj, from = c("anndata", "seurat", "sce", "loom"), to 
   from <- match.arg(from)
   to <- match.arg(to)
 
-  # Kaizen: Seurat v5 assay compatibility fix
+  # Seurat v5 compatibility guard
   if (from == "seurat") {
-    # Internal helper functions for Seurat v5 detection and conversion
-    .is_seurat_v5 <- function(obj) {
-      inherits(obj, "Seurat") && 
-      requireNamespace("Seurat", quietly = TRUE) && 
-      utils::packageVersion("Seurat") >= "5.0.0"
-    }
-    
-    .fix_seurat_v5_assays <- function(obj) {
-      if (!.is_seurat_v5(obj)) return(obj)
-      
-      for (assay_name in Seurat::Assays(obj)) {
-        assay_obj <- obj[[assay_name]]
-        if (inherits(assay_obj, "Assay5")) {
-          # Convert Assay5 to legacy Assay class
-          # Try different methods for compatibility across Seurat versions
-          tryCatch({
-            # Method 1: Direct coercion
-            obj[[assay_name]] <- as(object = assay_obj, Class = "Assay")
-          }, error = function(e1) {
-            tryCatch({
-              # Method 2: Using as.Assay
-              obj[[assay_name]] <- Seurat::as.Assay(assay_obj)
-            }, error = function(e2) {
-              # Method 3: Create new assay from slots (fallback)
-#              counts_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "counts"), error = function(e) NULL)
-#              data_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "data"), error = function(e) NULL)
-#              scale_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "scale.data"), error = function(e) NULL)
-              if (packageVersion("Seurat") >= "5.0.0") {
-                counts_slot <- tryCatch(Seurat::GetAssayData(assay_obj, layer = "counts"), error = function(e) NULL)
-                data_slot <- tryCatch(Seurat::GetAssayData(assay_obj, layer = "data"), error = function(e) NULL)
-                scale_slot <- tryCatch(Seurat::GetAssayData(assay_obj, layer = "scale.data"), error = function(e) NULL)
-                     } else {
-                counts_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "counts"), error = function(e) NULL)
-                data_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "data"), error = function(e) NULL)
-                scale_slot <- tryCatch(Seurat::GetAssayData(assay_obj, slot = "scale.data"), error = function(e) NULL)
-              }       
-                
-              new_assay <- Seurat::CreateAssayObject(counts = counts_slot)
-              if (!is.null(data_slot)) {
-                new_assay <- Seurat::SetAssayData(new_assay, slot = "data", new.data = data_slot)
-              }
-              if (!is.null(scale_slot)) {
-                new_assay <- Seurat::SetAssayData(new_assay, slot = "scale.data", new.data = scale_slot)
-              }
-              obj[[assay_name]] <- new_assay
-            })
-          })
+    if (requireNamespace("Seurat", quietly = TRUE) && 
+        inherits(obj, "Seurat") && 
+        utils::packageVersion("Seurat") >= "5.0.0") {
+      has_assay5 <- any(vapply(Seurat::Assays(obj), function(nm) inherits(obj[[nm]], "Assay5"), logical(1)))
+      if (has_assay5) {
+        warning("Seurat v5 object detected. Converting assays to v4 compatibility mode for conversion. Original object unchanged.")
+        for (assay_name in Seurat::Assays(obj)) {
+          if (inherits(obj[[assay_name]], "Assay5")) {
+            obj[[assay_name]] <- as(object = obj[[assay_name]], Class = "Assay")
+          }
         }
       }
-      return(obj)
-    }
-    
-    # Apply fix if object is Seurat v5
-    if (.is_seurat_v5(obj)) {
-      warning("Seurat v5 object detected. Converting assays to v4 compatibility mode for conversion. Original object unchanged.")
-      obj <- .fix_seurat_v5_assays(obj)
     }
   }
 
-  tryCatch(
-    {
-      func <- eval(parse(text = paste(from, to, sep = "2")))
-    },
-    error = function(e) {
-      stop(paste0('Unsupported conversion from "', from, '" to "', to, '"'), call. = FALSE)
-    },
-    finally = {}
+  converters <- list(
+    seurat2anndata = seurat2anndata,
+    seurat2sce     = seurat2sce,
+    sce2anndata    = sce2anndata,
+    sce2loom       = sce2loom,
+    loom2anndata   = loom2anndata,
+    loom2sce       = loom2sce,
+    anndata2seurat = anndata2seurat,
+    anndata2cds    = anndata2cds
   )
 
-  return(func(obj, outFile = outFile, main_layer = main_layer, ...))
+  key <- paste0(from, "2", to)
+  func <- converters[[key]]
+  if (is.null(func)) {
+    stop(paste0('Unsupported conversion from "', from, '" to "', to, '"'), call. = FALSE)
+  }
+
+  func(obj, outFile = outFile, main_layer = main_layer, ...)
 }

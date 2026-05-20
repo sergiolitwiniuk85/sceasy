@@ -1,5 +1,3 @@
-#!/usr/bin/env Rscript
-
 exchangeable_loom_version <- "3.0.0"
 
 isExchangeableLoom <- function(h5f) {
